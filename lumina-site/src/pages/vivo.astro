@@ -1,0 +1,272 @@
+---
+// Pagina del participante de la encuesta en vivo (clase gancho).
+// Movil-first: los ~120 asistentes entran por el link del chat, votan y dejan
+// preguntas. Standalone (sin header/footer del sitio) para que sea limpia y
+// rapida en el telefono. El presentador controla que se muestra desde /vivo/panel.
+import '../styles/global.css';
+
+const title = 'En vivo · Clase Lumina';
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <title>{title}</title>
+    <meta name="theme-color" content="#0A0E1A" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
+  </head>
+  <body class="min-h-screen bg-lum-cream text-lum-black">
+    <div class="mx-auto flex min-h-screen max-w-lg flex-col px-5 pb-10 pt-6">
+      <!-- Encabezado -->
+      <header class="mb-6 flex items-center justify-between">
+        <span class="font-serif text-lg font-extrabold tracking-tight">Lumina</span>
+        <span class="inline-flex items-center gap-2 rounded-full bg-lum-black/5 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-lum-charcoal">
+          <span class="relative flex h-2 w-2">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-lum-coral opacity-75"></span>
+            <span class="relative inline-flex h-2 w-2 rounded-full bg-lum-coral"></span>
+          </span>
+          En vivo
+        </span>
+      </header>
+
+      <!-- Escenario (lo controla el presentador) -->
+      <main id="stage" class="flex-1">
+        <div class="rounded-2xl border border-lum-border bg-white p-8 text-center shadow-soft">
+          <p class="text-lg font-semibold text-lum-charcoal">Conectando…</p>
+        </div>
+      </main>
+
+      <!-- Caja de preguntas: siempre disponible -->
+      <section id="qbox" class="mt-6 rounded-2xl border border-lum-border bg-white p-5 shadow-soft">
+        <h2 class="text-base font-bold text-lum-black">¿Qué le quieres preguntar a Claude?</h2>
+        <p class="mt-1 text-sm text-lum-slate">
+          Escribe tu pregunta. Al final, Claude las agrupa en vivo y las respondemos.
+        </p>
+        <form id="qform" class="mt-3">
+          <textarea
+            id="qtext"
+            rows="2"
+            maxlength="280"
+            placeholder="Ej: ¿Cómo automatizo mis reportes mensuales?"
+            class="w-full resize-none rounded-xl border border-lum-border bg-lum-ivory px-4 py-3 text-base text-lum-black outline-none focus:border-lum-coral focus:ring-2 focus:ring-lum-coral/30"
+          ></textarea>
+          <button
+            type="submit"
+            id="qsend"
+            class="mt-2 w-full rounded-xl bg-lum-black px-4 py-3 text-base font-semibold text-white transition active:scale-[0.99] disabled:opacity-50"
+          >
+            Enviar pregunta
+          </button>
+        </form>
+        <p id="qmsg" class="mt-2 hidden text-sm font-semibold text-lum-coral"></p>
+      </section>
+
+      <footer class="mt-6 text-center text-xs text-lum-slate">
+        luminaconsulting.ai · tu voto es anónimo
+      </footer>
+    </div>
+
+    <script>
+      const POLL_INTERVAL = 2500;
+      const stage = document.getElementById('stage');
+      let sig = '';
+      let latest = null;
+
+      const votedKey = (id) => 'vivo_v_' + id;
+      const hasVoted = (id) => localStorage.getItem(votedKey(id)) !== null;
+      const votedOption = (id) => {
+        const v = localStorage.getItem(votedKey(id));
+        return v === null ? null : Number(v);
+      };
+
+      function esc(s) {
+        return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      }
+
+      function waitingCard() {
+        return `<div class="rounded-2xl border border-lum-border bg-white p-8 text-center shadow-soft">
+          <p class="text-4xl">👀</p>
+          <p class="mt-3 text-lg font-semibold text-lum-charcoal">La encuesta parte en un momento</p>
+          <p class="mt-1 text-sm text-lum-slate">Mientras tanto, puedes dejar tu pregunta abajo.</p>
+        </div>`;
+      }
+
+      function questionsCard() {
+        return `<div class="rounded-2xl border-2 border-lum-coral bg-lum-coral-muted/40 p-8 text-center shadow-soft">
+          <p class="text-4xl">💬</p>
+          <p class="mt-3 text-lg font-bold text-lum-black">Es momento de preguntas</p>
+          <p class="mt-1 text-sm text-lum-charcoal">Escribe la tuya abajo 👇 Claude las va a agrupar en vivo.</p>
+        </div>`;
+      }
+
+      function pollButtons(poll) {
+        const opts = poll.options
+          .map(
+            (o, i) =>
+              `<button data-opt="${i}" class="vote-btn w-full rounded-xl border-2 border-lum-border bg-white px-4 py-4 text-left text-base font-semibold text-lum-black transition hover:border-lum-coral hover:bg-lum-coral-muted/30 active:scale-[0.99]">${esc(o)}</button>`
+          )
+          .join('');
+        return `<div class="rounded-2xl border border-lum-border bg-white p-6 shadow-soft">
+          <h1 class="text-xl font-bold leading-snug text-lum-black">${esc(poll.question)}</h1>
+          <p class="mt-1 text-sm text-lum-slate">Toca tu respuesta</p>
+          <div class="mt-4 flex flex-col gap-3">${opts}</div>
+        </div>`;
+      }
+
+      function pollBars(poll) {
+        const rows = poll.options
+          .map(
+            (o, i) =>
+              `<div class="bar-row" data-opt="${i}">
+                <div class="mb-1 flex items-center justify-between text-sm">
+                  <span class="font-semibold text-lum-black">${esc(o)}</span>
+                  <span class="bar-pct font-bold text-lum-coral">0%</span>
+                </div>
+                <div class="h-8 w-full overflow-hidden rounded-lg bg-lum-ivory">
+                  <div class="bar-fill flex h-8 items-center rounded-lg bg-lum-coral transition-all duration-500" style="width:0%"></div>
+                </div>
+              </div>`
+          )
+          .join('');
+        return `<div class="rounded-2xl border border-lum-border bg-white p-6 shadow-soft">
+          <h1 class="text-xl font-bold leading-snug text-lum-black">${esc(poll.question)}</h1>
+          <p class="mt-1 text-sm font-semibold text-lum-coral">✓ Tu voto quedó registrado</p>
+          <div class="mt-4 flex flex-col gap-4">${rows}</div>
+          <p class="mt-4 text-right text-xs text-lum-slate"><span class="bar-total">0</span> votos</p>
+        </div>`;
+      }
+
+      function buildStage(s) {
+        if (s.mode === 'poll' && s.poll) {
+          stage.innerHTML = hasVoted(s.poll.id) ? pollBars(s.poll) : pollButtons(s.poll);
+          if (!hasVoted(s.poll.id)) wireVoteButtons(s.poll);
+        } else if (s.mode === 'preguntas') {
+          stage.innerHTML = questionsCard();
+        } else {
+          stage.innerHTML = waitingCard();
+        }
+      }
+
+      function wireVoteButtons(poll) {
+        stage.querySelectorAll('.vote-btn').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const opt = Number(btn.getAttribute('data-opt'));
+            localStorage.setItem(votedKey(poll.id), String(opt));
+            // Resultado optimista: el voto propio se ve al instante; el siguiente
+            // tick lo reconcilia con el total real del servidor (sin doble conteo,
+            // porque el tick reemplaza 'latest' entero).
+            const base = latest && latest.results ? latest.results : { counts: {}, total: 0 };
+            const counts = { ...base.counts };
+            counts[opt] = Number(counts[opt] || 0) + 1;
+            latest = {
+              mode: 'poll',
+              active: poll.id,
+              poll,
+              results: { counts, total: (base.total || 0) + 1 },
+              questionCount: (latest && latest.questionCount) || 0,
+            };
+            sig = ''; // fuerza re-render a barras
+            buildStage({ mode: 'poll', poll });
+            updateNumbers(latest);
+            try {
+              await fetch('/api/vivo/votar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pollId: poll.id, option: opt }),
+              });
+              // Refresco inmediato: ya con el voto persistido, evita que un tick
+              // en vuelo (leido antes del POST) deje el conteo en 0 por ~2s.
+              await tick();
+            } catch (e) {}
+          });
+        });
+      }
+
+      function updateNumbers(s) {
+        if (!s) return;
+        if (s.mode === 'poll' && s.poll && s.results) {
+          const counts = s.results.counts || {};
+          const total = s.results.total || 0;
+          stage.querySelectorAll('.bar-row').forEach((row) => {
+            const i = row.getAttribute('data-opt');
+            const c = Number(counts[i] || 0);
+            const pct = total > 0 ? Math.round((c / total) * 100) : 0;
+            const fill = row.querySelector('.bar-fill');
+            const pctEl = row.querySelector('.bar-pct');
+            if (fill) fill.style.width = pct + '%';
+            if (pctEl) pctEl.textContent = pct + '%';
+            const mine = votedOption(s.poll.id);
+            if (mine !== null && Number(i) === mine && fill) {
+              fill.classList.add('ring-2', 'ring-lum-black');
+            }
+          });
+          const totalEl = stage.querySelector('.bar-total');
+          if (totalEl) totalEl.textContent = String(total);
+        }
+      }
+
+      function render(s) {
+        latest = s;
+        const votedFlag = s.poll ? (hasVoted(s.poll.id) ? 'v' : 'n') : '-';
+        const newSig = s.mode + '|' + (s.active || '') + '|' + votedFlag;
+        if (newSig !== sig) {
+          sig = newSig;
+          buildStage(s);
+        }
+        updateNumbers(s);
+      }
+
+      async function tick() {
+        try {
+          const r = await fetch('/api/vivo/estado');
+          if (r.ok) render(await r.json());
+        } catch (e) {}
+      }
+
+      // Formulario de preguntas
+      const qform = document.getElementById('qform');
+      const qtext = document.getElementById('qtext');
+      const qsend = document.getElementById('qsend');
+      const qmsg = document.getElementById('qmsg');
+      qform.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = qtext.value.trim();
+        if (!text) return;
+        qsend.disabled = true;
+        qsend.textContent = 'Enviando…';
+        try {
+          const r = await fetch('/api/vivo/pregunta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text }),
+          });
+          if (r.ok) {
+            qtext.value = '';
+            qmsg.textContent = '¡Enviada! 🙌 Puedes mandar otra.';
+            qmsg.classList.remove('hidden');
+          } else {
+            qmsg.textContent = 'No se pudo enviar, intenta de nuevo.';
+            qmsg.classList.remove('hidden');
+          }
+        } catch (e) {
+          qmsg.textContent = 'No se pudo enviar, intenta de nuevo.';
+          qmsg.classList.remove('hidden');
+        }
+        qsend.disabled = false;
+        qsend.textContent = 'Enviar pregunta';
+      });
+
+      tick();
+      setInterval(tick, POLL_INTERVAL);
+    </script>
+  </body>
+</html>

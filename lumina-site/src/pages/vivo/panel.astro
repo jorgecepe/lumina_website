@@ -1,0 +1,316 @@
+---
+// Panel del presentador (Jorge). Protegido por PANEL_KEY via ?k=SECRET.
+// Es la pantalla que se comparte en Meet: control del escenario, resultados en
+// vivo grandes, y el boton "Agrupar con Claude" (el momento wow).
+export const prerender = false;
+
+import { POLLS } from '../../lib/vivo-polls';
+
+function env(name: string): string | undefined {
+  const fromProcess = (globalThis as any)?.process?.env?.[name];
+  // @ts-ignore
+  const fromMeta = import.meta.env?.[name];
+  return fromProcess ?? fromMeta;
+}
+
+const k = Astro.url.searchParams.get('k') || '';
+const expected = env('PANEL_KEY');
+const authorized = !!expected && k === expected;
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <title>Panel · En vivo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
+    <style>
+      body { font-family: Inter, system-ui, sans-serif; }
+    </style>
+  </head>
+  <body class="min-h-screen bg-lum-black text-white">
+    {!authorized ? (
+      <div class="flex min-h-screen items-center justify-center p-8">
+        <div class="max-w-md rounded-2xl border border-white/10 bg-lum-charcoal p-8 text-center">
+          <p class="text-2xl">🔒</p>
+          <h1 class="mt-3 text-xl font-bold">Panel restringido</h1>
+          <p class="mt-2 text-sm text-white/60">
+            Necesitas el enlace con la clave de acceso: <code class="text-lum-coral-light">/vivo/panel?k=…</code>
+          </p>
+        </div>
+      </div>
+    ) : (
+      <div class="mx-auto max-w-6xl p-4 md:p-6">
+        <!-- Barra superior -->
+        <header class="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="font-serif text-xl font-extrabold">Lumina · Panel en vivo</span>
+            <span id="storeBadge" class="rounded-full bg-white/10 px-2 py-0.5 text-[11px] uppercase tracking-wider text-white/50"></span>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <a href="/vivo" target="_blank" class="rounded-lg bg-white/10 px-3 py-1.5 font-semibold hover:bg-white/20">Ver /vivo ↗</a>
+            <button id="btnReset" class="rounded-lg bg-lum-error/20 px-3 py-1.5 font-semibold text-lum-error hover:bg-lum-error/30">Reiniciar todo</button>
+          </div>
+        </header>
+
+        <!-- Controles de escenario -->
+        <div class="mb-5 rounded-2xl border border-white/10 bg-lum-charcoal p-4">
+          <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-white/40">Mostrar en las pantallas del público</p>
+          <div id="controls" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <div class="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
+          <!-- Display grande (para compartir) -->
+          <section id="display" class="min-h-[340px] rounded-2xl border border-white/10 bg-lum-charcoal p-6"></section>
+
+          <!-- Columna de preguntas -->
+          <section class="rounded-2xl border border-white/10 bg-lum-charcoal p-5">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-bold">Preguntas del público</h2>
+              <span id="qCount" class="rounded-full bg-lum-coral px-3 py-1 text-sm font-bold">0</span>
+            </div>
+            <div class="mt-3 flex flex-col gap-2">
+              <button id="btnAgrupar" class="w-full rounded-xl bg-lum-coral px-4 py-3 text-base font-bold text-white transition hover:bg-lum-coral-light active:scale-[0.99] disabled:opacity-50">
+                ✨ Agrupar con Claude
+              </button>
+              <div class="flex gap-2">
+                <button id="btnMock" class="flex-1 rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20">Ensayo (demo)</button>
+                <button id="btnClearQ" class="flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm font-semibold text-white/60 hover:bg-white/10">Borrar preguntas</button>
+              </div>
+            </div>
+            <div id="qList" class="mt-4 flex max-h-[420px] flex-col gap-2 overflow-y-auto pr-1"></div>
+          </section>
+        </div>
+      </div>
+    )}
+
+    {authorized && (
+      <script define:vars={{ KEY: k, POLLS }}>
+        const POLL_INTERVAL = 2500;
+        const controls = document.getElementById('controls');
+        const display = document.getElementById('display');
+        const qList = document.getElementById('qList');
+        const qCount = document.getElementById('qCount');
+        const storeBadge = document.getElementById('storeBadge');
+        let state = null;
+        let showClusters = false;
+        let dispSig = '';
+
+        function esc(s) {
+          return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        }
+
+        // ---- Controles de escenario ----
+        const SCENES = [
+          { id: 'espera', label: '⏸ Espera' },
+          ...POLLS.map((p) => ({ id: p.id, label: p.question })),
+          { id: 'preguntas', label: '💬 Preguntas' },
+        ];
+        controls.innerHTML = SCENES.map(
+          (s) =>
+            `<button data-scene="${s.id}" class="scene-btn rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm font-semibold hover:bg-white/15">${esc(s.label)}</button>`
+        ).join('');
+        controls.querySelectorAll('.scene-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            showClusters = false;
+            setActive(btn.getAttribute('data-scene'));
+          });
+        });
+
+        function highlightActive(active) {
+          controls.querySelectorAll('.scene-btn').forEach((btn) => {
+            const on = btn.getAttribute('data-scene') === active;
+            btn.classList.toggle('bg-lum-coral', on);
+            btn.classList.toggle('border-lum-coral', on);
+            btn.classList.toggle('bg-white/5', !on);
+          });
+        }
+
+        // ---- Display grande ----
+        function pollById(id) { return (state?.polls || []).find((p) => p.id === id); }
+
+        function buildDisplay(active) {
+          const poll = pollById(active);
+          if (poll) {
+            const rows = poll.options
+              .map(
+                (o, i) =>
+                  `<div class="bar-row" data-opt="${i}">
+                    <div class="mb-1 flex items-center justify-between text-lg">
+                      <span class="font-semibold">${esc(o)}</span>
+                      <span class="text-white/70"><span class="bar-count font-bold text-white">0</span> · <span class="bar-pct font-bold text-lum-coral-light">0%</span></span>
+                    </div>
+                    <div class="h-10 w-full overflow-hidden rounded-lg bg-white/10">
+                      <div class="bar-fill h-10 rounded-lg bg-lum-coral transition-all duration-500" style="width:0%"></div>
+                    </div>
+                  </div>`
+              )
+              .join('');
+            display.innerHTML = `<h1 class="text-2xl font-extrabold leading-tight">${esc(poll.question)}</h1>
+              <div class="mt-5 flex flex-col gap-4">${rows}</div>
+              <p class="mt-5 text-right text-sm text-white/50"><span class="bar-total">0</span> votos</p>`;
+          } else if (active === 'preguntas') {
+            display.innerHTML = `<div class="flex h-full min-h-[300px] flex-col items-center justify-center text-center">
+              <p class="text-5xl">💬</p>
+              <p class="mt-4 text-2xl font-bold">Preguntas abiertas</p>
+              <p class="mt-2 text-white/60">El público está escribiendo. Cuando quieras, aprieta "Agrupar con Claude".</p>
+            </div>`;
+          } else {
+            display.innerHTML = `<div class="flex h-full min-h-[300px] flex-col items-center justify-center text-center">
+              <p class="text-5xl">⏸</p>
+              <p class="mt-4 text-2xl font-bold">En espera</p>
+              <p class="mt-2 text-white/60">Elige una encuesta arriba para mostrarla.</p>
+            </div>`;
+          }
+        }
+
+        function updateDisplayNumbers(active) {
+          const poll = pollById(active);
+          if (!poll) return;
+          const total = poll.total || 0;
+          let max = 0;
+          poll.options.forEach((_, i) => { max = Math.max(max, Number(poll.counts[i] || 0)); });
+          display.querySelectorAll('.bar-row').forEach((row) => {
+            const i = row.getAttribute('data-opt');
+            const c = Number(poll.counts[i] || 0);
+            const pct = total > 0 ? Math.round((c / total) * 100) : 0;
+            const fill = row.querySelector('.bar-fill');
+            const pctEl = row.querySelector('.bar-pct');
+            const cEl = row.querySelector('.bar-count');
+            if (fill) {
+              fill.style.width = pct + '%';
+              fill.classList.toggle('bg-lum-coral-light', c === max && c > 0);
+              fill.classList.toggle('bg-lum-coral', !(c === max && c > 0));
+            }
+            if (pctEl) pctEl.textContent = pct + '%';
+            if (cEl) cEl.textContent = String(c);
+          });
+          const totalEl = display.querySelector('.bar-total');
+          if (totalEl) totalEl.textContent = String(total);
+        }
+
+        function renderClusters(res) {
+          showClusters = true;
+          const clusters = res.clusters || [];
+          if (!clusters.length) {
+            display.innerHTML = `<div class="flex h-full min-h-[300px] items-center justify-center text-white/60">Aún no hay preguntas para agrupar.</div>`;
+            return;
+          }
+          const cards = clusters
+            .map(
+              (c, i) =>
+                `<div class="rounded-xl border border-lum-coral/40 bg-lum-coral/10 p-5">
+                  <div class="flex items-center gap-3">
+                    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-lum-coral text-base font-extrabold">${i + 1}</span>
+                    <h3 class="text-xl font-extrabold">${esc(c.titulo || '')}</h3>
+                    ${c.n_aprox ? `<span class="ml-auto rounded-full bg-white/10 px-3 py-1 text-sm font-bold">~${esc(c.n_aprox)}</span>` : ''}
+                  </div>
+                  <p class="mt-2 text-white/80">${esc(c.resumen || '')}</p>
+                  ${c.ejemplo ? `<p class="mt-2 border-l-2 border-lum-coral pl-3 text-sm italic text-white/60">"${esc(c.ejemplo)}"</p>` : ''}
+                </div>`
+            )
+            .join('');
+          display.innerHTML = `<div class="mb-4 flex items-center gap-2">
+              <h1 class="text-2xl font-extrabold">Claude leyó ${res.total || ''} preguntas y encontró 3 temas</h1>
+            </div>
+            <div class="flex flex-col gap-3">${cards}</div>`;
+        }
+
+        // ---- Preguntas (lista cruda) ----
+        function renderQuestions() {
+          const qs = state?.questions || [];
+          qCount.textContent = String(qs.length);
+          qList.innerHTML = qs.length
+            ? qs
+                .map((q) => `<div class="rounded-lg bg-white/5 px-3 py-2 text-sm text-white/80">${esc(q.t)}</div>`)
+                .join('')
+            : '<p class="text-sm text-white/40">Sin preguntas todavía.</p>';
+        }
+
+        // ---- Acciones ----
+        async function setActive(target) {
+          await post({ action: 'setActive', pollId: target });
+          await tick();
+        }
+        async function post(body) {
+          try {
+            const r = await fetch('/api/vivo/panel', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ key: KEY, ...body }),
+            });
+            return await r.json();
+          } catch (e) { return { ok: false }; }
+        }
+
+        document.getElementById('btnReset').addEventListener('click', async () => {
+          if (!confirm('¿Reiniciar TODO? Se borran votos y preguntas.')) return;
+          showClusters = false;
+          await post({ action: 'reset' });
+          await tick();
+        });
+        document.getElementById('btnClearQ').addEventListener('click', async () => {
+          if (!confirm('¿Borrar todas las preguntas?')) return;
+          await post({ action: 'clearQuestions' });
+          await tick();
+        });
+
+        const btnAgrupar = document.getElementById('btnAgrupar');
+        const btnMock = document.getElementById('btnMock');
+        async function agrupar(mock) {
+          btnAgrupar.disabled = true;
+          const label = btnAgrupar.textContent;
+          btnAgrupar.textContent = '⏳ Claude está leyendo…';
+          try {
+            const r = await fetch('/api/vivo/agrupar', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ key: KEY, mock: !!mock }),
+            });
+            const res = await r.json();
+            if (res.ok) renderClusters(res);
+            else {
+              display.innerHTML = `<div class="flex h-full min-h-[300px] items-center justify-center text-lum-error">Error al agrupar (${esc(res.error || '')}). Reintenta.</div>`;
+              showClusters = true;
+            }
+          } catch (e) {
+            display.innerHTML = `<div class="flex h-full min-h-[300px] items-center justify-center text-lum-error">Error de red. Reintenta.</div>`;
+            showClusters = true;
+          }
+          btnAgrupar.disabled = false;
+          btnAgrupar.textContent = label;
+        }
+        btnAgrupar.addEventListener('click', () => agrupar(false));
+        btnMock.addEventListener('click', () => agrupar(true));
+
+        // ---- Loop ----
+        async function tick() {
+          try {
+            const r = await fetch('/api/vivo/panel?k=' + encodeURIComponent(KEY));
+            if (!r.ok) return;
+            state = await r.json();
+            if (storeBadge && r.headers) storeBadge.textContent = '';
+            highlightActive(state.active);
+            renderQuestions();
+            if (!showClusters) {
+              const newSig = 'display|' + state.active;
+              if (newSig !== dispSig) { dispSig = newSig; buildDisplay(state.active); }
+              updateDisplayNumbers(state.active);
+            }
+          } catch (e) {}
+        }
+
+        tick();
+        setInterval(tick, POLL_INTERVAL);
+      </script>
+    )}
+  </body>
+</html>
