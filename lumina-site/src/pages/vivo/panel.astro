@@ -278,7 +278,14 @@ const authorized = !!expected && k === expected;
             const res = await r.json();
             if (res.ok) renderClusters(res);
             else {
-              display.innerHTML = `<div class="flex h-full min-h-[300px] items-center justify-center text-lum-error">Error al agrupar (${esc(res.error || '')}). Reintenta.</div>`;
+              const extra = [res.status ? 'HTTP ' + res.status : '', res.model ? 'modelo: ' + res.model : '', res.detail ? esc(res.detail) : '']
+                .filter(Boolean)
+                .join(' · ');
+              display.innerHTML = `<div class="flex h-full min-h-[300px] flex-col items-center justify-center gap-3 p-6 text-center">
+                <p class="text-lg font-bold text-lum-error">Error al agrupar (${esc(res.error || '')})</p>
+                ${extra ? `<p class="max-w-xl text-sm text-white/60">${extra}</p>` : ''}
+                <p class="text-xs text-white/40">Reintenta, o usa "Ensayo (demo)" como respaldo.</p>
+              </div>`;
               showClusters = true;
             }
           } catch (e) {

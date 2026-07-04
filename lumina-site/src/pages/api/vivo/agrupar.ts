@@ -107,7 +107,10 @@ export const POST: APIRoute = async ({ request }) => {
     if (!r.ok) {
       const detail = await r.text();
       console.error('anthropic error', r.status, detail);
-      return json({ ok: false, error: 'ai_provider', status: r.status }, 502);
+      return json(
+        { ok: false, error: 'ai_provider', status: r.status, model, detail: String(detail).slice(0, 400) },
+        502
+      );
     }
 
     const payload: any = await r.json();
