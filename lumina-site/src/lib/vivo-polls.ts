@@ -13,12 +13,12 @@ export type Poll = {
 
 export const POLLS: Poll[] = [
   {
-    id: 'pagada',
+    id: 'paga',
     question: '¿Quién paga hoy por alguna herramienta de IA?',
     options: ['Sí', 'No'],
   },
   {
-    id: 'llm',
+    id: 'ia',
     question: '¿Qué IA usan?',
     multi: true,
     options: ['ChatGPT', 'Claude', 'Gemini', 'Copilot', 'Perplexity', 'Otra'],
