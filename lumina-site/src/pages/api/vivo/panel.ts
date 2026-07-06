@@ -1,7 +1,10 @@
 // Endpoint de administracion del panel del presentador. Protegido por PANEL_KEY.
 //   GET  /api/vivo/panel?k=SECRET      -> estado completo (activo + resultados de
-//                                         todas las encuestas + preguntas crudas).
+//                                         todas las encuestas + preguntas crudas
+//                                         + conteo de suscriptores).
 //                                         Sin cache: es solo Jorge (1 cliente).
+//   GET  /api/vivo/panel?k=SECRET&export=subs -> descarga la lista de
+//                                         suscriptores como CSV (correo,fecha_iso).
 //   POST /api/vivo/panel  { key, action, pollId? }
 //        action = 'setActive'  (pollId | 'preguntas' | 'espera')
 //               | 'reset'      (borra votos + preguntas, vuelve a espera)
@@ -16,6 +19,8 @@ import {
   getQuestions,
   clearAll,
   clearQuestions,
+  subscriberCount,
+  getSubscribers,
 } from '../../../lib/vivo-store';
 import { POLLS, POLL_IDS, QUESTIONS, WAITING } from '../../../lib/vivo-polls';
 
@@ -38,8 +43,25 @@ function checkKey(provided: string | null): boolean {
   return provided === expected;
 }
 
+// Escapa un campo para CSV (RFC 4180): comillas dobles alrededor y "" internas.
+const csvCell = (s: string) => `"${s.replace(/"/g, '""')}"`;
+
 export const GET: APIRoute = async ({ url }) => {
   if (!checkKey(url.searchParams.get('k'))) return json({ ok: false, error: 'forbidden' }, 403);
+
+  if (url.searchParams.get('export') === 'subs') {
+    const subs = await getSubscribers();
+    const rows = subs.map((s) => `${csvCell(s.email)},${csvCell(new Date(s.ts).toISOString())}`);
+    const csv = ['correo,fecha_iso', ...rows].join('\r\n');
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="suscriptores-lumina.csv"',
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
 
   const active = await getActive();
   const polls = [];
@@ -49,8 +71,16 @@ export const GET: APIRoute = async ({ url }) => {
     polls.push({ id: p.id, question: p.question, options: p.options, counts, total });
   }
   const questions = await getQuestions();
+  const subsCount = await subscriberCount();
 
-  return json({ ok: true, active, polls, questions, questionCount: questions.length });
+  return json({
+    ok: true,
+    active,
+    polls,
+    questions,
+    questionCount: questions.length,
+    subsCount,
+  });
 };
 
 export const POST: APIRoute = async ({ request }) => {

@@ -70,6 +70,32 @@ const title = 'En vivo · Clase Lumina';
         <p id="qmsg" class="mt-2 hidden text-sm font-semibold text-lum-coral"></p>
       </section>
 
+      <!-- Captura de correos: avisar de proximos cursos/charlas -->
+      <section id="subbox" class="mt-6 rounded-2xl border border-lum-border bg-white p-5 shadow-soft">
+        <h2 class="text-base font-bold text-lum-black">¿Quieres saber de los próximos?</h2>
+        <p class="mt-1 text-sm text-lum-slate">
+          Déjame tu correo y te aviso de próximos cursos y charlas. Algunos serán gratuitos y otros pagados. No comparto tu correo con nadie ni te mando spam.
+        </p>
+        <form id="subform" class="mt-3">
+          <input
+            id="subemail"
+            type="email"
+            inputmode="email"
+            autocomplete="email"
+            placeholder="tu@correo.cl"
+            class="w-full rounded-xl border border-lum-border bg-lum-ivory px-4 py-3 text-base text-lum-black outline-none focus:border-lum-coral focus:ring-2 focus:ring-lum-coral/30"
+          />
+          <button
+            type="submit"
+            id="subsend"
+            class="mt-2 w-full rounded-xl bg-lum-black px-4 py-3 text-base font-semibold text-white transition active:scale-[0.99] disabled:opacity-50"
+          >
+            Avísame de próximos cursos
+          </button>
+        </form>
+        <p id="submsg" class="mt-2 hidden text-sm font-semibold text-lum-coral"></p>
+      </section>
+
       <footer class="mt-6 text-center text-xs text-lum-slate">
         luminaconsulting.ai · tu voto es anónimo
       </footer>
@@ -263,6 +289,57 @@ const title = 'En vivo · Clase Lumina';
         }
         qsend.disabled = false;
         qsend.textContent = 'Enviar pregunta';
+      });
+
+      // Captura de correos
+      const SUB_KEY = 'lumina_suscrito';
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const subbox = document.getElementById('subbox');
+      const subform = document.getElementById('subform');
+      const subemail = document.getElementById('subemail');
+      const subsend = document.getElementById('subsend');
+      const submsg = document.getElementById('submsg');
+
+      function subThanks() {
+        subbox.innerHTML = `<div class="text-center">
+          <p class="text-3xl">🙌</p>
+          <p class="mt-2 text-base font-bold text-lum-black">¡Listo! Te aviso cuando abra el próximo.</p>
+        </div>`;
+      }
+
+      if (localStorage.getItem(SUB_KEY)) subThanks();
+
+      subform.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = subemail.value.trim().toLowerCase();
+        if (!EMAIL_RE.test(email)) {
+          submsg.textContent = 'Revisa tu correo, parece que falta algo.';
+          submsg.classList.remove('hidden');
+          return;
+        }
+        submsg.classList.add('hidden');
+        subsend.disabled = true;
+        subsend.textContent = 'Enviando…';
+        try {
+          const r = await fetch('/api/vivo/suscribir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          const res = await r.json();
+          if (r.ok && res.ok) {
+            localStorage.setItem(SUB_KEY, '1');
+            subThanks();
+            return;
+          }
+          submsg.textContent = 'No se pudo guardar, intenta de nuevo.';
+          submsg.classList.remove('hidden');
+        } catch (e) {
+          submsg.textContent = 'No se pudo guardar, intenta de nuevo.';
+          submsg.classList.remove('hidden');
+        }
+        subsend.disabled = false;
+        subsend.textContent = 'Avísame de próximos cursos';
       });
 
       tick();

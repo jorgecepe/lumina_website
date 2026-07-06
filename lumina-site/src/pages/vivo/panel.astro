@@ -89,6 +89,17 @@ const authorized = !!expected && k === expected;
             <div id="qList" class="mt-4 flex max-h-[420px] flex-col gap-2 overflow-y-auto pr-1"></div>
           </section>
         </div>
+
+        <!-- Suscriptores (captura de correos en /vivo) -->
+        <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-lum-charcoal p-4">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-white/40">Suscriptores</p>
+            <p class="mt-1 text-lg font-bold"><span id="subsCount">0</span> correos</p>
+          </div>
+          <a id="btnSubs" download="suscriptores-lumina.csv" class="rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20">
+            ⬇ Descargar suscriptores (CSV)
+          </a>
+        </div>
       </div>
     )}
 
@@ -99,7 +110,10 @@ const authorized = !!expected && k === expected;
         const display = document.getElementById('display');
         const qList = document.getElementById('qList');
         const qCount = document.getElementById('qCount');
+        const subsCountEl = document.getElementById('subsCount');
+        const btnSubs = document.getElementById('btnSubs');
         const storeBadge = document.getElementById('storeBadge');
+        btnSubs.href = '/api/vivo/panel?k=' + encodeURIComponent(KEY) + '&export=subs';
         let state = null;
         let showClusters = false;
         let dispSig = '';
@@ -307,6 +321,7 @@ const authorized = !!expected && k === expected;
             if (storeBadge && r.headers) storeBadge.textContent = '';
             highlightActive(state.active);
             renderQuestions();
+            if (subsCountEl) subsCountEl.textContent = String(state.subsCount || 0);
             if (!showClusters) {
               const newSig = 'display|' + state.active;
               if (newSig !== dispSig) { dispSig = newSig; buildDisplay(state.active); }

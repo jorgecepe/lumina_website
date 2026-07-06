@@ -44,12 +44,14 @@ const mem = {
   active: WAITING as string,
   votes: {} as Record<string, Record<string, number>>,
   questions: [] as { t: string; ts: number }[],
+  subs: {} as Record<string, number>,
 };
 
 const K = {
   active: 'vivo:active',
   votes: (id: string) => `vivo:votes:${id}`,
   questions: 'vivo:questions',
+  subs: 'vivo:subs',
 };
 
 export async function getActive(): Promise<string> {
@@ -122,6 +124,32 @@ export async function clearQuestions(): Promise<void> {
     return;
   }
   mem.questions = [];
+}
+
+// Suscriptores: lista de correos para avisar de proximos cursos/charlas. Se
+// guarda como HASH (campo = correo en minusculas, valor = timestamp) para
+// deduplicar por correo y conservar la hora. NO se toca en clearAll(): la lista
+// debe sobrevivir a un reinicio de la clase.
+export async function saveSubscriber(email: string): Promise<void> {
+  if (redis) {
+    await redis.hset(K.subs, { [email]: Date.now() });
+    return;
+  }
+  mem.subs[email] = Date.now();
+}
+
+export async function getSubscribers(): Promise<{ email: string; ts: number }[]> {
+  const src = redis
+    ? (await redis.hgetall<Record<string, string | number>>(K.subs)) || {}
+    : mem.subs;
+  return Object.entries(src)
+    .map(([email, ts]) => ({ email, ts: Number(ts) || 0 }))
+    .sort((a, b) => a.ts - b.ts);
+}
+
+export async function subscriberCount(): Promise<number> {
+  if (redis) return (await redis.hlen(K.subs)) || 0;
+  return Object.keys(mem.subs).length;
 }
 
 export async function clearAll(): Promise<void> {
