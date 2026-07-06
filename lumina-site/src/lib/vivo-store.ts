@@ -45,6 +45,7 @@ const mem = {
   votes: {} as Record<string, Record<string, number>>,
   questions: [] as { t: string; ts: number }[],
   subs: {} as Record<string, number>,
+  cuello: [] as { t: string; ts: number }[],
 };
 
 const K = {
@@ -52,6 +53,7 @@ const K = {
   votes: (id: string) => `vivo:votes:${id}`,
   questions: 'vivo:questions',
   subs: 'vivo:subs',
+  cuello: 'vivo:cuello',
 };
 
 export async function getActive(): Promise<string> {
@@ -75,6 +77,18 @@ export async function incrVote(pollId: string, option: number): Promise<void> {
   mem.votes[pollId] ??= {};
   const key = String(option);
   mem.votes[pollId][key] = (mem.votes[pollId][key] || 0) + 1;
+}
+
+// Respondientes de una encuesta multiple: 1 por persona que envia, aunque marque
+// varias opciones. Campo especial '__resp' en el mismo hash de votos, para
+// calcular porcentajes sobre personas (no sobre menciones).
+export async function incrRespondents(pollId: string): Promise<void> {
+  if (redis) {
+    await redis.hincrby(K.votes(pollId), '__resp', 1);
+    return;
+  }
+  mem.votes[pollId] ??= {};
+  mem.votes[pollId]['__resp'] = (mem.votes[pollId]['__resp'] || 0) + 1;
 }
 
 export async function getVotes(pollId: string): Promise<Record<string, number>> {
@@ -152,15 +166,48 @@ export async function subscriberCount(): Promise<number> {
   return Object.keys(mem.subs).length;
 }
 
+// Cuello de botella: respuestas abiertas a la pregunta 3 (lista separada de las
+// preguntas al expositor). Se limpia con clearAll (dato de la clase).
+export async function addBottleneck(text: string): Promise<void> {
+  const item = JSON.stringify({ t: text, ts: Date.now() });
+  if (redis) {
+    await redis.lpush(K.cuello, item);
+    return;
+  }
+  mem.cuello.unshift({ t: text, ts: Date.now() });
+}
+
+export async function getBottlenecks(): Promise<{ t: string; ts: number }[]> {
+  if (redis) {
+    const raw = (await redis.lrange<string>(K.cuello, 0, -1)) || [];
+    return raw
+      .map((r) => {
+        try {
+          return typeof r === 'string' ? JSON.parse(r) : (r as any);
+        } catch {
+          return { t: String(r), ts: 0 };
+        }
+      })
+      .filter((q) => q && typeof q.t === 'string');
+  }
+  return [...mem.cuello];
+}
+
+export async function bottleneckCount(): Promise<number> {
+  if (redis) return (await redis.llen(K.cuello)) || 0;
+  return mem.cuello.length;
+}
+
 export async function clearAll(): Promise<void> {
   if (redis) {
-    await redis.del(K.active, K.questions, ...POLL_IDS.map((id) => K.votes(id)));
+    await redis.del(K.active, K.questions, K.cuello, ...POLL_IDS.map((id) => K.votes(id)));
     await redis.set(K.active, WAITING);
     return;
   }
   mem.active = WAITING;
   mem.votes = {};
   mem.questions = [];
+  mem.cuello = [];
 }
 
 // ---- Env vars ----

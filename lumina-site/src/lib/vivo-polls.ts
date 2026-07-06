@@ -6,42 +6,27 @@
 export type Poll = {
   id: string;
   question: string;
-  options: string[];
+  type?: 'choice' | 'open'; // 'choice' por defecto
+  multi?: boolean; // solo choice: permite marcar varias opciones
+  options?: string[]; // solo choice
 };
 
 export const POLLS: Poll[] = [
   {
     id: 'pagada',
-    question: '¿Pagas por alguna IA hoy?',
-    options: ['Sí, pago al menos una', 'No, uso solo las gratis', 'No uso IA todavía'],
+    question: '¿Quién paga hoy por alguna herramienta de IA?',
+    options: ['Sí', 'No'],
   },
   {
     id: 'llm',
-    question: '¿Cuál es tu IA de preferencia hoy?',
-    options: ['ChatGPT', 'Claude', 'Gemini', 'Copilot u otra', 'Ninguna aún'],
-  },
-  {
-    id: 'area',
-    question: '¿En qué área te desempeñas?',
-    options: [
-      'Comercial / Ventas',
-      'Finanzas / Control de gestión',
-      'Operaciones / Procesos',
-      'Gerencia general / Dirección',
-      'Consultoría / Servicios',
-      'Otra',
-    ],
+    question: '¿Qué IA usan?',
+    multi: true,
+    options: ['ChatGPT', 'Claude', 'Gemini', 'Copilot', 'Perplexity', 'Otra'],
   },
   {
     id: 'cuello',
     question: '¿Cuál es tu mayor cuello de botella hoy?',
-    options: [
-      'Procesos manuales repetitivos',
-      'Análisis de datos / Excel',
-      'Armar informes / presentaciones',
-      'Redacción (correos / propuestas)',
-      'Otra',
-    ],
+    type: 'open',
   },
 ];
 

@@ -21,6 +21,7 @@ import {
   clearQuestions,
   subscriberCount,
   getSubscribers,
+  getBottlenecks,
 } from '../../../lib/vivo-store';
 import { POLLS, POLL_IDS, QUESTIONS, WAITING } from '../../../lib/vivo-polls';
 
@@ -66,11 +67,18 @@ export const GET: APIRoute = async ({ url }) => {
   const active = await getActive();
   const polls = [];
   for (const p of POLLS) {
+    if (p.type === 'open') {
+      polls.push({ id: p.id, question: p.question, type: 'open' });
+      continue;
+    }
     const counts = await getVotes(p.id);
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    polls.push({ id: p.id, question: p.question, options: p.options, counts, total });
+    let sumOpts = 0;
+    for (const [k, v] of Object.entries(counts)) if (/^\d+$/.test(k)) sumOpts += Number(v) || 0;
+    const total = p.multi ? Number(counts['__resp'] || 0) : sumOpts;
+    polls.push({ id: p.id, question: p.question, type: 'choice', multi: !!p.multi, options: p.options || [], counts, total });
   }
   const questions = await getQuestions();
+  const cuello = await getBottlenecks();
   const subsCount = await subscriberCount();
 
   return json({
@@ -79,6 +87,8 @@ export const GET: APIRoute = async ({ url }) => {
     polls,
     questions,
     questionCount: questions.length,
+    cuello,
+    cuelloCount: cuello.length,
     subsCount,
   });
 };

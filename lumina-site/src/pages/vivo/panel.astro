@@ -151,10 +151,24 @@ const authorized = !!expected && k === expected;
         // ---- Display grande ----
         function pollById(id) { return (state?.polls || []).find((p) => p.id === id); }
 
+        function renderOpenDisplay(poll) {
+          const subs = (state && state.cuello) || [];
+          const items = subs.length
+            ? subs.map((s) => `<div class="rounded-lg bg-white/5 px-3 py-2 text-base text-white/85">${esc(s.t)}</div>`).join('')
+            : '<p class="text-white/40">Sin respuestas todavía.</p>';
+          display.innerHTML = `<div class="flex items-center justify-between">
+              <h1 class="text-2xl font-extrabold leading-tight">${esc(poll.question)}</h1>
+              <span class="rounded-full bg-lum-coral px-3 py-1 text-sm font-bold">${subs.length}</span>
+            </div>
+            <div class="mt-4 flex max-h-[440px] flex-col gap-2 overflow-y-auto pr-1">${items}</div>`;
+        }
+
         function buildDisplay(active) {
           const poll = pollById(active);
-          if (poll) {
-            const rows = poll.options
+          if (poll && poll.type === 'open') {
+            renderOpenDisplay(poll);
+          } else if (poll) {
+            const rows = (poll.options || [])
               .map(
                 (o, i) =>
                   `<div class="bar-row" data-opt="${i}">
@@ -168,9 +182,14 @@ const authorized = !!expected && k === expected;
                   </div>`
               )
               .join('');
+            const sub = poll.multi
+              ? '<p class="mt-1 text-white/50">Se puede elegir varias · % sobre quienes respondieron</p>'
+              : '';
+            const totalLabel = poll.multi ? 'respondieron' : 'votos';
             display.innerHTML = `<h1 class="text-2xl font-extrabold leading-tight">${esc(poll.question)}</h1>
+              ${sub}
               <div class="mt-5 flex flex-col gap-4">${rows}</div>
-              <p class="mt-5 text-right text-sm text-white/50"><span class="bar-total">0</span> votos</p>`;
+              <p class="mt-5 text-right text-sm text-white/50"><span class="bar-total">0</span> ${totalLabel}</p>`;
           } else if (active === 'preguntas') {
             display.innerHTML = `<div class="flex h-full min-h-[300px] flex-col items-center justify-center text-center">
               <p class="text-5xl">💬</p>
@@ -323,9 +342,15 @@ const authorized = !!expected && k === expected;
             renderQuestions();
             if (subsCountEl) subsCountEl.textContent = String(state.subsCount || 0);
             if (!showClusters) {
-              const newSig = 'display|' + state.active;
-              if (newSig !== dispSig) { dispSig = newSig; buildDisplay(state.active); }
-              updateDisplayNumbers(state.active);
+              const activePoll = pollById(state.active);
+              if (activePoll && activePoll.type === 'open') {
+                renderOpenDisplay(activePoll); // refresca la lista cada tick
+                dispSig = 'open|' + state.active;
+              } else {
+                const newSig = 'display|' + state.active;
+                if (newSig !== dispSig) { dispSig = newSig; buildDisplay(state.active); }
+                updateDisplayNumbers(state.active);
+              }
             }
           } catch (e) {}
         }

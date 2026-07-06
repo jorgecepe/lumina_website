@@ -18,20 +18,32 @@ export const GET: APIRoute = async () => {
   const poll = getPoll(active);
 
   let results: { counts: Record<string, number>; total: number } | null = null;
-  if (poll) {
+  if (poll && poll.type !== 'open' && poll.options) {
     const counts = await getVotes(poll.id);
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    let sumOpts = 0;
+    for (const [k, v] of Object.entries(counts)) if (/^\d+$/.test(k)) sumOpts += Number(v) || 0;
+    // Single: total = suma de opciones (1 voto por persona).
+    // Multi: total = personas que respondieron (para % sobre personas).
+    const total = poll.multi ? Number(counts['__resp'] || 0) : sumOpts;
     results = { counts, total };
   }
 
   const qCount = await questionCount();
 
-  const mode = poll ? 'poll' : active === QUESTIONS ? 'preguntas' : WAITING;
+  const mode = poll ? (poll.type === 'open' ? 'openpoll' : 'poll') : active === QUESTIONS ? 'preguntas' : WAITING;
 
   const body = {
     mode,
     active,
-    poll: poll ? { id: poll.id, question: poll.question, options: poll.options } : null,
+    poll: poll
+      ? {
+          id: poll.id,
+          question: poll.question,
+          type: poll.type || 'choice',
+          multi: !!poll.multi,
+          options: poll.options || [],
+        }
+      : null,
     results,
     questionCount: qCount,
   };

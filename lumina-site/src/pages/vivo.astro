@@ -47,9 +47,9 @@ const title = 'En vivo · Clase Lumina';
 
       <!-- Caja de preguntas: siempre disponible -->
       <section id="qbox" class="mt-6 rounded-2xl border border-lum-border bg-white p-5 shadow-soft">
-        <h2 class="text-base font-bold text-lum-black">¿Qué le quieres preguntar a Claude?</h2>
+        <h2 class="text-base font-bold text-lum-black">¿Qué le quieres preguntar al expositor?</h2>
         <p class="mt-1 text-sm text-lum-slate">
-          Escribe tu pregunta. Al final, Claude las agrupa en vivo y las respondemos.
+          Escribe tu pregunta para Jorge. Las respondemos en la clase.
         </p>
         <form id="qform" class="mt-3">
           <textarea
@@ -130,8 +130,62 @@ const title = 'En vivo · Clase Lumina';
         return `<div class="rounded-2xl border-2 border-lum-coral bg-lum-coral-muted/40 p-8 text-center shadow-soft">
           <p class="text-4xl">💬</p>
           <p class="mt-3 text-lg font-bold text-lum-black">Es momento de preguntas</p>
-          <p class="mt-1 text-sm text-lum-charcoal">Escribe la tuya abajo 👇 Claude las va a agrupar en vivo.</p>
+          <p class="mt-1 text-sm text-lum-charcoal">Escríbele la tuya al expositor abajo 👇 Las respondemos en la clase.</p>
         </div>`;
+      }
+
+      // Pregunta abierta (ej. cuello de botella): textarea propio que postea a /api/vivo/cuello.
+      function openPollCard(poll) {
+        return `<div class="rounded-2xl border border-lum-border bg-white p-6 shadow-soft">
+          <h1 class="text-xl font-bold leading-snug text-lum-black">${esc(poll.question)}</h1>
+          <p class="mt-1 text-sm text-lum-slate">Escríbelo en una frase</p>
+          <form id="opform" class="mt-4">
+            <textarea id="optext" rows="2" maxlength="280"
+              placeholder="Ej: Paso horas armando reportes a mano"
+              class="w-full resize-none rounded-xl border border-lum-border bg-lum-ivory px-4 py-3 text-base text-lum-black outline-none focus:border-lum-coral focus:ring-2 focus:ring-lum-coral/30"></textarea>
+            <button type="submit" id="opsend" class="mt-2 w-full rounded-xl bg-lum-black px-4 py-3 text-base font-semibold text-white transition active:scale-[0.99] disabled:opacity-50">Enviar</button>
+            <p id="opmsg" class="mt-2 hidden text-sm font-semibold text-lum-coral"></p>
+          </form>
+        </div>`;
+      }
+
+      function openThanksCard() {
+        return `<div class="rounded-2xl border-2 border-lum-coral bg-lum-coral-muted/40 p-8 text-center shadow-soft">
+          <p class="text-4xl">✅</p>
+          <p class="mt-3 text-lg font-bold text-lum-black">¡Gracias! Recibí tu respuesta.</p>
+        </div>`;
+      }
+
+      function wireOpenPoll(poll) {
+        const form = document.getElementById('opform');
+        const text = document.getElementById('optext');
+        const send = document.getElementById('opsend');
+        const msg = document.getElementById('opmsg');
+        if (!form) return;
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const t = text.value.trim();
+          if (!t) return;
+          send.disabled = true;
+          send.textContent = 'Enviando…';
+          try {
+            const r = await fetch('/api/vivo/cuello', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: t }),
+            });
+            if (r.ok) {
+              localStorage.setItem(votedKey('open_' + poll.id), '1');
+              sig = '';
+              buildStage({ mode: 'openpoll', poll });
+              return;
+            }
+          } catch (e) {}
+          msg.textContent = 'No se pudo enviar, intenta de nuevo.';
+          msg.classList.remove('hidden');
+          send.disabled = false;
+          send.textContent = 'Enviar';
+        });
       }
 
       function pollButtons(poll) {
@@ -141,6 +195,14 @@ const title = 'En vivo · Clase Lumina';
               `<button data-opt="${i}" class="vote-btn w-full rounded-xl border-2 border-lum-border bg-white px-4 py-4 text-left text-base font-semibold text-lum-black transition hover:border-lum-coral hover:bg-lum-coral-muted/30 active:scale-[0.99]">${esc(o)}</button>`
           )
           .join('');
+        if (poll.multi) {
+          return `<div class="rounded-2xl border border-lum-border bg-white p-6 shadow-soft">
+            <h1 class="text-xl font-bold leading-snug text-lum-black">${esc(poll.question)}</h1>
+            <p class="mt-1 text-sm text-lum-slate">Marca todas las que uses</p>
+            <div class="mt-4 flex flex-col gap-3">${opts}</div>
+            <button id="msend" class="mt-4 w-full rounded-xl bg-lum-black px-4 py-3 text-base font-semibold text-white transition active:scale-[0.99] disabled:opacity-50">Enviar</button>
+          </div>`;
+        }
         return `<div class="rounded-2xl border border-lum-border bg-white p-6 shadow-soft">
           <h1 class="text-xl font-bold leading-snug text-lum-black">${esc(poll.question)}</h1>
           <p class="mt-1 text-sm text-lum-slate">Toca tu respuesta</p>
@@ -163,16 +225,22 @@ const title = 'En vivo · Clase Lumina';
               </div>`
           )
           .join('');
+        const done = poll.multi ? '✓ Tus respuestas quedaron registradas' : '✓ Tu voto quedó registrado';
+        const totalLabel = poll.multi ? 'respondieron' : 'votos';
         return `<div class="rounded-2xl border border-lum-border bg-white p-6 shadow-soft">
           <h1 class="text-xl font-bold leading-snug text-lum-black">${esc(poll.question)}</h1>
-          <p class="mt-1 text-sm font-semibold text-lum-coral">✓ Tu voto quedó registrado</p>
+          <p class="mt-1 text-sm font-semibold text-lum-coral">${done}</p>
           <div class="mt-4 flex flex-col gap-4">${rows}</div>
-          <p class="mt-4 text-right text-xs text-lum-slate"><span class="bar-total">0</span> votos</p>
+          <p class="mt-4 text-right text-xs text-lum-slate"><span class="bar-total">0</span> ${totalLabel}</p>
         </div>`;
       }
 
       function buildStage(s) {
-        if (s.mode === 'poll' && s.poll) {
+        if (s.mode === 'openpoll' && s.poll) {
+          const k = 'open_' + s.poll.id;
+          stage.innerHTML = hasVoted(k) ? openThanksCard() : openPollCard(s.poll);
+          if (!hasVoted(k)) wireOpenPoll(s.poll);
+        } else if (s.mode === 'poll' && s.poll) {
           stage.innerHTML = hasVoted(s.poll.id) ? pollBars(s.poll) : pollButtons(s.poll);
           if (!hasVoted(s.poll.id)) wireVoteButtons(s.poll);
         } else if (s.mode === 'preguntas') {
@@ -183,6 +251,7 @@ const title = 'En vivo · Clase Lumina';
       }
 
       function wireVoteButtons(poll) {
+        if (poll.multi) return wireMultiVote(poll);
         stage.querySelectorAll('.vote-btn').forEach((btn) => {
           btn.addEventListener('click', async () => {
             const opt = Number(btn.getAttribute('data-opt'));
@@ -217,6 +286,51 @@ const title = 'En vivo · Clase Lumina';
         });
       }
 
+      // Voto multiple: se marcan varias opciones y se envia con el boton.
+      function wireMultiVote(poll) {
+        const sel = new Set();
+        stage.querySelectorAll('.vote-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const i = Number(btn.getAttribute('data-opt'));
+            if (sel.has(i)) {
+              sel.delete(i);
+              btn.classList.remove('border-lum-coral', 'bg-lum-coral-muted/40');
+            } else {
+              sel.add(i);
+              btn.classList.add('border-lum-coral', 'bg-lum-coral-muted/40');
+            }
+          });
+        });
+        const send = document.getElementById('msend');
+        if (send)
+          send.addEventListener('click', async () => {
+            if (!sel.size) return;
+            const arr = [...sel];
+            localStorage.setItem(votedKey(poll.id), JSON.stringify(arr));
+            const base = latest && latest.results ? latest.results : { counts: {}, total: 0 };
+            const counts = { ...base.counts };
+            arr.forEach((o) => { counts[o] = Number(counts[o] || 0) + 1; });
+            latest = {
+              mode: 'poll',
+              active: poll.id,
+              poll,
+              results: { counts, total: (base.total || 0) + 1 },
+              questionCount: (latest && latest.questionCount) || 0,
+            };
+            sig = '';
+            buildStage({ mode: 'poll', poll });
+            updateNumbers(latest);
+            try {
+              await fetch('/api/vivo/votar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pollId: poll.id, options: arr }),
+              });
+              await tick();
+            } catch (e) {}
+          });
+      }
+
       function updateNumbers(s) {
         if (!s) return;
         if (s.mode === 'poll' && s.poll && s.results) {
@@ -230,8 +344,17 @@ const title = 'En vivo · Clase Lumina';
             const pctEl = row.querySelector('.bar-pct');
             if (fill) fill.style.width = pct + '%';
             if (pctEl) pctEl.textContent = pct + '%';
-            const mine = votedOption(s.poll.id);
-            if (mine !== null && Number(i) === mine && fill) {
+            const raw = localStorage.getItem(votedKey(s.poll.id));
+            let mineSet = null;
+            if (raw !== null) {
+              try {
+                const parsed = JSON.parse(raw);
+                mineSet = Array.isArray(parsed) ? new Set(parsed.map(Number)) : new Set([Number(parsed)]);
+              } catch (e) {
+                mineSet = new Set([Number(raw)]);
+              }
+            }
+            if (mineSet && mineSet.has(Number(i)) && fill) {
               fill.classList.add('ring-2', 'ring-lum-black');
             }
           });
@@ -242,7 +365,8 @@ const title = 'En vivo · Clase Lumina';
 
       function render(s) {
         latest = s;
-        const votedFlag = s.poll ? (hasVoted(s.poll.id) ? 'v' : 'n') : '-';
+        const vkey = s.poll ? (s.mode === 'openpoll' ? 'open_' + s.poll.id : s.poll.id) : null;
+        const votedFlag = vkey ? (hasVoted(vkey) ? 'v' : 'n') : '-';
         const newSig = s.mode + '|' + (s.active || '') + '|' + votedFlag;
         if (newSig !== sig) {
           sig = newSig;
