@@ -1,0 +1,88 @@
+---
+// Pagina de links cortos (luminaconsulting.ai/links).
+// Destino estable para codigos QR impresos o proyectados en clases y talleres:
+// el QR apunta aca y el destino real se puede cambiar sin regenerar el QR.
+// Standalone (sin header/footer del sitio) y noindex, igual que /vivo.
+// Para agregar o cambiar un link, editar el arreglo `links` y hacer push a main.
+import '../styles/global.css';
+
+const title = 'Links · Lumina';
+
+const links = [
+  {
+    etiqueta: 'Google Drive',
+    titulo: 'Material del curso',
+    detalle: 'Data3 · 202602',
+    url: 'https://drive.google.com/drive/folders/1IlpUV0iUO6FuAVVpBTuDfTXswBmC4MHq?usp=sharing',
+  },
+];
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <title>{title}</title>
+    <meta name="theme-color" content="#0A0E1A" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
+  </head>
+  <body class="min-h-screen bg-lum-cream text-lum-black">
+    <main class="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-5 py-12">
+      <div class="mb-9 text-center">
+        <img src="/logo-wide-transparent.png" alt="Lumina Consulting" class="mx-auto mb-6 h-9 w-auto" />
+        <h1 class="text-2xl font-extrabold tracking-tight">Links</h1>
+        <p class="mt-2 text-sm text-lum-slate">Accesos directos al material.</p>
+      </div>
+
+      <div class="space-y-3">
+        {links.map((link) => (
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="group flex items-center gap-4 rounded-lg border border-lum-border bg-white px-5 py-4 shadow-soft transition hover:-translate-y-0.5 hover:border-lum-coral hover:shadow-elevated"
+          >
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-lum-coral-muted text-lum-coral">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+                />
+              </svg>
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block font-mono text-mono-xs uppercase tracking-wider text-lum-slate">
+                {link.etiqueta}
+              </span>
+              <span class="block text-base font-semibold leading-snug">{link.titulo}</span>
+              <span class="block text-sm text-lum-slate">{link.detalle}</span>
+            </span>
+            <svg
+              class="h-5 w-5 shrink-0 text-lum-slate transition group-hover:translate-x-0.5 group-hover:text-lum-coral"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
+        ))}
+      </div>
+
+      <p class="mt-10 text-center text-sm text-lum-slate">
+        <a href="/" class="font-medium text-lum-coral hover:underline">luminaconsulting.ai</a>
+      </p>
+    </main>
+  </body>
+</html>
