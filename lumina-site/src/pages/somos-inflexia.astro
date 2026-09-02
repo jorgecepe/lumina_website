@@ -1,0 +1,22 @@
+---
+// Aviso del cambio de marca, en espanol. Ruta de destino de los redirects 307
+// de vercel.json para todas las rutas de marketing del sitio viejo.
+import PuenteInflexia from '../components/PuenteInflexia.astro';
+
+const t = {
+  title: 'Ahora somos INFLEXIA',
+  description: 'Lumina Consulting ahora es INFLEXIA. El sitio está en inflexia.cl.',
+  kicker: 'Cambio de nombre',
+  tituloAntes: 'Lumina Consulting ahora es',
+  parrafo:
+    'El sitio está ahora en <a href="https://inflexia.cl/">inflexia.cl</a>. Los servicios, los proyectos en curso y los compromisos vigentes se mantienen sin cambios: cambia el nombre y la dirección web.',
+  nota: 'Los correos a las direcciones @luminaconsulting.ai siguen llegando a la misma casilla.',
+  contadorAntes: 'Redirección automática en ',
+  contadorDespues: ' segundos.',
+  detenido: 'Redirección detenida.',
+  irAhora: 'Ir a inflexia.cl',
+  quedarme: 'Quedarme aquí',
+};
+---
+
+<PuenteInflexia lang="es" t={t} />

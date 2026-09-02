@@ -1,0 +1,22 @@
+---
+// Brand change notice, English version. Destination of the 307 redirects in
+// vercel.json for every /en/ marketing route of the old site.
+import PuenteInflexia from '../../components/PuenteInflexia.astro';
+
+const t = {
+  title: 'We are now INFLEXIA',
+  description: 'Lumina Consulting is now INFLEXIA. The site is at inflexia.cl.',
+  kicker: 'Name change',
+  tituloAntes: 'Lumina Consulting is now',
+  parrafo:
+    'The site is now at <a href="https://inflexia.cl/">inflexia.cl</a>. Services, ongoing projects and current commitments remain unchanged: only the name and the web address are different.',
+  nota: 'Emails sent to @luminaconsulting.ai addresses still reach the same inbox.',
+  contadorAntes: 'Redirecting automatically in ',
+  contadorDespues: ' seconds.',
+  detenido: 'Redirect stopped.',
+  irAhora: 'Go to inflexia.cl',
+  quedarme: 'Stay here',
+};
+---
+
+<PuenteInflexia lang="en" t={t} />
