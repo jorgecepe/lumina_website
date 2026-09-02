@@ -4,7 +4,7 @@
     { "source": "/en", "destination": "/en/we-are-now-inflexia", "permanent": false },
     { "source": "/en/", "destination": "/en/we-are-now-inflexia", "permanent": false },
     { "source": "/en/:ruta((?!we-are-now-inflexia).+)", "destination": "/en/we-are-now-inflexia", "permanent": false },
-    { "source": "/:ruta((?!somos-inflexia|en/|vivo|links|clase-ia|api/|_astro/|_image|.*\\.).+)", "destination": "/somos-inflexia", "permanent": false },
+    { "source": "/:ruta((?!somos-inflexia|no-contar|en/|vivo|links|clase-ia|api/|_astro/|_image|.*\\.).+)", "destination": "/somos-inflexia", "permanent": false },
     { "source": "/servicios/automatizacion-reporteria", "destination": "/servicios/automatizacion-inteligente", "permanent": true },
     { "source": "/servicios/analisis-competencia", "destination": "/servicios/inteligencia-competitiva", "permanent": true },
     { "source": "/servicios/capacitacion-sence", "destination": "/servicios/capacitacion", "permanent": true },

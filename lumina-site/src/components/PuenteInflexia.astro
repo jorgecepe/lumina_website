@@ -51,6 +51,16 @@ const SEGUNDOS = 6;
     <meta property="og:title" content={t.title} />
     <meta property="og:description" content={t.description} />
     <meta property="og:url" content={DESTINO} />
+
+    <!-- Analítica propia (Umami en el VPS). Va acá porque esta pantalla es hoy
+         la única página visible del dominio, así que sin esto no se registraría
+         ninguna visita. Las de Jorge se excluyen una vez en /no-contar. -->
+    <script
+      is:inline
+      defer
+      src="https://analitica.inflexia.cl/script.js"
+      data-website-id="880dcb79-3dad-48c2-8a76-582f733d3aaf"></script>
+
     <style is:inline>
       :root {
         --tinta-900: #0a2133;

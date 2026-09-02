@@ -333,5 +333,14 @@ const enURL = isEnglish ? canonicalURL : (alternatePath ? new URL(alternatePath,
       import { inject } from '@vercel/analytics';
       inject();
     </script>
+
+    <!-- Analítica propia (Umami en el VPS). Convive con la de Vercel: esta es la
+         que alimenta el reporte semanal por correo, porque Vercel no expone API.
+         Las visitas de Jorge se excluyen una vez en /no-contar. -->
+    <script
+      is:inline
+      defer
+      src="https://analitica.inflexia.cl/script.js"
+      data-website-id="880dcb79-3dad-48c2-8a76-582f733d3aaf"></script>
   </body>
 </html>

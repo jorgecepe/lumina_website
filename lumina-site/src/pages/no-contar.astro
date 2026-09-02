@@ -1,0 +1,156 @@
+---
+// Excluye este navegador de la analítica del sitio.
+//
+// Umami respeta la marca `umami.disabled` en localStorage: si está puesta, el
+// script no envía nada. Como localStorage es por dominio, esta página hay que
+// visitarla una vez en cada navegador y en cada uno de los dos sitios: la copia
+// gemela vive en inflexia.cl/no-contar.
+//
+// Standalone y noindex a propósito, y excluida del redirect del aviso de marca
+// en vercel.json: si cayera en el aviso, no habría forma de llegar a ella.
+const ID_MARCA = 'umami.disabled';
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>No contar este navegador</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <style is:inline>
+      :root {
+        --tinta-700: #0f2e44;
+        --teal-700: #14606c;
+        --fondo: #f5f7f8;
+        --blanco: #ffffff;
+        --borde: #dde3e7;
+        --gris: #5e6b75;
+        --exito: #2f7d3a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 2rem 1.25rem;
+        background: var(--fondo);
+        color: var(--tinta-700);
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.6;
+      }
+      main {
+        width: 100%;
+        max-width: 30rem;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.3rem;
+        font-weight: 500;
+      }
+      p {
+        margin: 0.75rem 0 0;
+        color: var(--gris);
+        font-size: 0.9375rem;
+      }
+      .estado {
+        margin-top: 1.5rem;
+        padding: 1rem 1.25rem;
+        background: var(--blanco);
+        border: 1px solid var(--borde);
+        border-left: 3px solid var(--teal-700);
+        border-radius: 3px;
+        font-weight: 500;
+      }
+      .estado.excluido {
+        border-left-color: var(--exito);
+      }
+      button {
+        margin-top: 1.5rem;
+        padding: 0.7rem 1.4rem;
+        border-radius: 3px;
+        border: 1px solid var(--borde);
+        background: var(--blanco);
+        color: var(--tinta-700);
+        font: inherit;
+        font-size: 0.9375rem;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: var(--tinta-700);
+      }
+      code {
+        font-size: 0.8125rem;
+        color: var(--teal-700);
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <h1>Analítica de luminaconsulting.ai</h1>
+      <p>
+        Esta página decide si las visitas hechas desde <strong>este navegador</strong> se cuentan
+        en las métricas del sitio. La marca queda guardada acá mismo, en el navegador, así que
+        hay que repetirlo en cada equipo y en cada navegador que uses.
+      </p>
+
+      <div class="estado" id="estado">Revisando...</div>
+      <button type="button" id="alternar" hidden></button>
+
+      <p>
+        Se borra sola si limpias los datos del sitio. Para el otro dominio, la página equivalente
+        es <code>inflexia.cl/no-contar</code>.
+      </p>
+    </main>
+
+    <script is:inline define:vars={{ ID_MARCA }}>
+      (function () {
+        var estado = document.getElementById('estado');
+        var boton = document.getElementById('alternar');
+
+        function leer() {
+          try {
+            return window.localStorage.getItem(ID_MARCA) === '1';
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function pintar() {
+          var excluido = leer();
+          if (excluido === null) {
+            estado.textContent =
+              'Este navegador bloquea el almacenamiento local, así que no se puede excluir desde acá.';
+            boton.hidden = true;
+            return;
+          }
+          estado.textContent = excluido
+            ? 'Tus visitas desde este navegador NO se están contando.'
+            : 'Tus visitas desde este navegador SÍ se están contando.';
+          estado.className = excluido ? 'estado excluido' : 'estado';
+          boton.textContent = excluido ? 'Volver a contarlas' : 'Dejar de contar mis visitas';
+          boton.hidden = false;
+        }
+
+        boton.addEventListener('click', function () {
+          try {
+            if (leer()) {
+              window.localStorage.removeItem(ID_MARCA);
+            } else {
+              window.localStorage.setItem(ID_MARCA, '1');
+            }
+          } catch (e) {
+            /* sin almacenamiento, pintar() lo informa */
+          }
+          pintar();
+        });
+
+        pintar();
+      })();
+    </script>
+  </body>
+</html>
